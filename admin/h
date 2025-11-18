@@ -1,0 +1,33 @@
+<?php
+session_start();
+include "db.php";
+
+if (!isset($_SESSION['admin_username'])) {
+    header("Location: login_admin.php");
+    exit();
+}
+
+$npm = $_GET['npm'] ?? '';
+
+if (!$npm) {
+    echo "<script>
+        alert('❌ NPM tidak ditemukan!');
+        window.location.href = 'akun_mahasiswa.php';
+    </script>";
+    exit();
+}
+
+$hapus = mysqli_query($conn, "DELETE FROM akun_mahasiswa WHERE npm='$npm'");
+
+if ($hapus) {
+    echo "<script>
+        alert('✅ Akun mahasiswa berhasil dihapus.');
+        window.location.href = 'akun_mahasiswa.php';
+    </script>";
+} else {
+    echo "<script>
+        alert('❌ Gagal menghapus akun mahasiswa.');
+        window.location.href = 'akun_mahasiswa.php';
+    </script>";
+}
+?>
