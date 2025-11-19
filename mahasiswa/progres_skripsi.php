@@ -55,45 +55,15 @@ function getJudulBab($bab) {
     <style>
         /* Layout Fixed (Sama dengan Dashboard) */
         body { background-color: #f4f6f9; margin: 0; padding: 0; overflow-x: hidden; }
-        
-        /* Header */
-        .header {
-            position: fixed; top: 0; left: 0; width: 100%; height: 70px;
-            background-color: #ffffff; border-bottom: 1px solid #dee2e6;
-            z-index: 1050; display: flex; align-items: center; justify-content: space-between;
-            padding: 0 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        }
+        .header { position: fixed; top: 0; left: 0; width: 100%; height: 70px; background-color: #ffffff; border-bottom: 1px solid #dee2e6; z-index: 1050; display: flex; align-items: center; justify-content: space-between; padding: 0 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
         .header h4 { font-size: 1.2rem; font-weight: 700; color: #333; margin-left: 10px; }
-
-        /* Sidebar */
-        .sidebar {
-            position: fixed; top: 70px; left: 0; width: 250px; height: calc(100vh - 70px);
-            background-color: #343a40; color: white; overflow-y: auto; padding-top: 20px; z-index: 1040;
-        }
-        .sidebar a {
-            color: #cfd8dc; text-decoration: none; display: block; padding: 12px 25px;
-            border-radius: 0 25px 25px 0; margin-bottom: 5px; transition: all 0.3s;
-            border-left: 4px solid transparent;
-        }
+        .sidebar { position: fixed; top: 70px; left: 0; width: 250px; height: calc(100vh - 70px); background-color: #343a40; color: white; overflow-y: auto; padding-top: 20px; z-index: 1040; }
+        .sidebar a { color: #cfd8dc; text-decoration: none; display: block; padding: 12px 25px; border-radius: 0 25px 25px 0; margin-bottom: 5px; transition: all 0.3s; border-left: 4px solid transparent; }
         .sidebar a:hover { background-color: #495057; color: #fff; }
-        
-        /* Link Aktif Manual */
-        .sidebar a.active {
-            background-color: #0d6efd; color: #ffffff; font-weight: bold;
-            border-left: 4px solid #ffc107; padding-left: 30px;
-        }
-
-        /* Content */
+        .sidebar a.active { background-color: #0d6efd; color: #ffffff; font-weight: bold; border-left: 4px solid #ffc107; padding-left: 30px; }
         .main-content { margin-top: 70px; margin-left: 250px; padding: 30px; width: auto; }
-        
-        /* Custom Card Bab */
-        .card-bab {
-            background: white; border-radius: 12px; padding: 20px; margin-bottom: 25px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid #e9ecef;
-        }
+        .card-bab { background: white; border-radius: 12px; padding: 20px; margin-bottom: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid #e9ecef; }
         .card-bab h5 { color: #0d6efd; font-weight: bold; margin-bottom: 15px; border-bottom: 2px solid #f0f2f5; padding-bottom: 10px; }
-        
-        /* Table Style */
         .table th { background-color: #343a40; color: white; }
         .riwayat-komentar { background: #f8f9fa; padding: 15px; border-left: 4px solid #17a2b8; margin-top: 5px; font-size: 0.9rem; }
     </style>
@@ -110,7 +80,13 @@ function getJudulBab($bab) {
             <small class="text-muted" style="display:block; font-size: 11px;">Login Sebagai</small>
             <span style="font-weight: 600; font-size: 14px;"><?= htmlspecialchars($nama_mhs) ?></span>
         </div>
-        <div style="width: 40px; height: 40px; border-radius: 50%; background: #e9ecef; display: flex; align-items: center; justify-content: center; font-size: 20px;">👤</div>
+        <div style="width: 40px; height: 40px; border-radius: 50%; background: #e9ecef; display: flex; align-items: center; justify-content: center; font-size: 20px; overflow: hidden;">
+             <?php if (!empty($foto_mhs) && file_exists("../uploads/" . $foto_mhs)): ?>
+                <img src="../uploads/<?= $foto_mhs ?>" style="width: 100%; height: 100%; object-fit: cover;">
+            <?php else: ?>
+                👤
+            <?php endif; ?>
+        </div>
     </div>
 </div>
 
@@ -172,10 +148,9 @@ function getJudulBab($bab) {
                     </thead>
                     <tbody>
                         <?php
-                        // Cek apakah tabel progres ada
                         $cek_tabel = mysqli_query($conn, "SHOW TABLES LIKE 'progres_skripsi'");
                         if (mysqli_num_rows($cek_tabel) > 0) {
-                            // Gunakan NPM Tampil (NPM Real) untuk mencari progres
+                            // [PERBAIKAN] Gunakan $npm_tampil (NPM dari Database)
                             $sql = "SELECT * FROM progres_skripsi WHERE npm = ? AND bab = ? ORDER BY created_at DESC";
                             $stmt = $conn->prepare($sql);
                             $stmt->bind_param("si", $npm_tampil, $i);
@@ -210,9 +185,7 @@ function getJudulBab($bab) {
                             </td>
                             <td class="text-center">
                                 <button class='btn btn-sm btn-info text-white'
-                                    onclick='toggleKomentar(<?= $row['id'] ?>,
-                                            <?= json_encode($row['komentar_dosen1']) ?>,
-                                            <?= json_encode($row['komentar_dosen2']) ?>)'>
+                                    onclick='toggleKomentar(<?= $row['id'] ?>)'>
                                     💬 Komentar
                                 </button>
                             </td>
@@ -223,11 +196,15 @@ function getJudulBab($bab) {
                                     <div class="row">
                                         <div class="col-md-6 border-end">
                                             <strong class="text-primary">Komentar Pembimbing 1:</strong><br>
-                                            <span id="komentar1_<?= $row['id'] ?>" class="d-block mt-1 text-dark"></span>
+                                            <span class="d-block mt-1 text-dark">
+                                                <?= !empty($row['komentar_dosen1']) ? $row['komentar_dosen1'] : '<em class="text-muted">Tidak ada komentar.</em>' ?>
+                                            </span>
                                         </div>
                                         <div class="col-md-6">
                                             <strong class="text-primary">Komentar Pembimbing 2:</strong><br>
-                                            <span id="komentar2_<?= $row['id'] ?>" class="d-block mt-1 text-dark"></span>
+                                            <span class="d-block mt-1 text-dark">
+                                                <?= !empty($row['komentar_dosen2']) ? $row['komentar_dosen2'] : '<em class="text-muted">Tidak ada komentar.</em>' ?>
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
@@ -251,7 +228,6 @@ function getJudulBab($bab) {
 </div>
 
 <script>
-    // Bersihkan URL (hapus ?upload=success)
     if (window.history.replaceState) {
         const url = new URL(window.location);
         url.searchParams.delete('upload');
@@ -260,14 +236,9 @@ function getJudulBab($bab) {
     }
 
     // Toggle Komentar
-    function toggleKomentar(id, komentar1, komentar2) {
+    function toggleKomentar(id) {
         const row = document.getElementById("komentar_row_" + id);
-        const k1 = document.getElementById("komentar1_" + id);
-        const k2 = document.getElementById("komentar2_" + id);
-
         if (row.style.display === "none") {
-            k1.innerHTML = komentar1 ? komentar1 : "<em class='text-muted'>Tidak ada komentar.</em>";
-            k2.innerHTML = komentar2 ? komentar2 : "<em class='text-muted'>Tidak ada komentar.</em>";
             row.style.display = "table-row";
         } else {
             row.style.display = "none";

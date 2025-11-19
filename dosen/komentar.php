@@ -10,7 +10,7 @@ if (!isset($_SESSION['nip'])) {
 }
 
 $nip = $_SESSION['nip'];
-$dosen = mysqli_fetch_assoc(mysqli_query($conn, "SELECT * FROM biodata_dosen WHERE nip = '$nip'"));
+$dosen = mysqli_fetch_assoc(mysqli_query($conn, "SELECT * FROM data_dosen WHERE nip = '$nip'"));
 
 $foto_path = !empty($dosen['foto']) && file_exists("uploads/" . $dosen['foto']) 
     ? "uploads/" . $dosen['foto']
@@ -22,7 +22,7 @@ if (!$npm) {
     exit();
 }
 
-$mhs = mysqli_fetch_assoc(mysqli_query($conn, "SELECT * FROM biodata_mahasiswa WHERE npm = '$npm'"));
+$mhs = mysqli_fetch_assoc(mysqli_query($conn, "SELECT * FROM data_mahasiswa WHERE npm = '$npm'"));
 if (!$mhs) {
     echo "❌ Mahasiswa dengan NPM '$npm' tidak ditemukan.";
     exit();

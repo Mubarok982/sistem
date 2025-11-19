@@ -1,10 +1,8 @@
 <?php
 session_start();
-// Sesuaikan path db.php (Naik satu folder ke root atau admin)
 include "../admin/db.php";
 
 // Cek Login Dosen
-// Session 'nip' diisi NIDK/NIP saat login
 if (!isset($_SESSION['nip'])) {
     header("Location: ../auth/login.php");
     exit();
@@ -12,8 +10,7 @@ if (!isset($_SESSION['nip'])) {
 
 $nip_login = $_SESSION['nip'];
 
-// --- 1. AMBIL DATA DOSEN (Query JOIN) ---
-// Kita butuh ID Dosen untuk mencari mahasiswa bimbingan di tabel skripsi
+// --- 1. AMBIL DATA DOSEN ---
 $query_dosen = "SELECT m.id, m.nama, m.foto, d.nidk 
                 FROM mstr_akun m
                 JOIN data_dosen d ON m.id = d.id
@@ -27,10 +24,9 @@ if (!$dosen) {
     exit();
 }
 
-$id_dosen = $dosen['id']; // ID ini dipakai untuk filter bimbingan
+$id_dosen = $dosen['id'];
 
 // --- 2. AMBIL DAFTAR MAHASISWA BIMBINGAN ---
-// Cari di tabel skripsi dimana pembimbing1 atau pembimbing2 adalah ID Dosen ini
 $query_mhs = "SELECT 
                 m.nama,
                 dm.npm,
@@ -43,23 +39,32 @@ $query_mhs = "SELECT
 
 $result_mhs = mysqli_query($conn, $query_mhs);
 
-// Fungsi Hitung Progres
+// --- FUNGSI HITUNG PROGRES (LOGIKA BARU & BENAR) ---
 function hitungProgres($conn, $npm) {
     // Cek tabel dulu
     $cek = mysqli_query($conn, "SHOW TABLES LIKE 'progres_skripsi'");
     if (mysqli_num_rows($cek) == 0) return 0;
 
-    $sql = "SELECT progres_dosen1, progres_dosen2 FROM progres_skripsi WHERE npm = ?";
+    // Logika: Ambil poin tertinggi per bab, jumlahkan semua bab, lalu bagi 5
+    // (Max Poin Bab = 100. Total 5 Bab = 500. Jadi Total / 5 = Persen)
+    
+    $sql = "SELECT SUM(poin_bab) as total FROM (
+                SELECT (MAX(progres_dosen1) + MAX(progres_dosen2)) as poin_bab 
+                FROM progres_skripsi 
+                WHERE npm = ? 
+                GROUP BY bab
+            ) as subquery";
+            
     $stmt = $conn->prepare($sql);
     if ($stmt) {
         $stmt->bind_param("s", $npm);
         $stmt->execute();
         $res = $stmt->get_result();
-        $total = 0;
-        while ($row = $res->fetch_assoc()) {
-            $total += (int)$row['progres_dosen1'] + (int)$row['progres_dosen2'];
-        }
-        return min(100, round($total));
+        $row = $res->fetch_assoc();
+        $total = $row['total'] ?? 0;
+        
+        // Konversi ke persen (Total Skor / 5)
+        return min(100, round($total / 5));
     }
     return 0;
 }
@@ -76,7 +81,7 @@ function hitungProgres($conn, $npm) {
   <style>
     /* Layout Fixed */
     body { background-color: #f4f6f9; margin: 0; padding: 0; overflow-x: hidden; }
-    .header { position: fixed; top: 0; left: 0; width: 100%; height: 70px; background-color: #fff; border-bottom: 1px solid #dee2e6; z-index: 1050; display: flex; align-items: center; justify-content: space-between; padding: 0 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    .header { position: fixed; top: 0; left: 0; width: 100%; height: 70px; background-color: #ffffff; border-bottom: 1px solid #dee2e6; z-index: 1050; display: flex; align-items: center; justify-content: space-between; padding: 0 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
     .header h4 { font-size: 1.2rem; font-weight: 700; color: #333; margin-left: 10px; }
     .sidebar { position: fixed; top: 70px; left: 0; width: 250px; height: calc(100vh - 70px); background-color: #343a40; color: white; overflow-y: auto; padding-top: 20px; z-index: 1040; }
     .sidebar a { color: #cfd8dc; text-decoration: none; display: block; padding: 12px 25px; border-radius: 0 25px 25px 0; margin-bottom: 5px; transition: all 0.3s; }
