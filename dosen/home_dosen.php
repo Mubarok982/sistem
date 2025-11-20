@@ -1,6 +1,7 @@
 <?php
 session_start();
 include "../admin/db.php";
+include "../templates/sidebar_dosen.php";
 
 // Cek Login Dosen
 if (!isset($_SESSION['nip'])) {
