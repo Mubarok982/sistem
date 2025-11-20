@@ -6,7 +6,7 @@ if (!isset($_SESSION['admin_username'])) {
     header("Location: ../auth/login.php");
     exit();
 }
-$nama_admin = $_SESSION['nama_admin'] ?? 'Admin';
+$nama_admin = $_SESSION['admin_username'] ?? 'Admin'; // Menggunakan username
 
 // --- 1. HITUNG STATISTIK ---
 $q_dosen = mysqli_query($conn, "SELECT COUNT(*) as total FROM mstr_akun WHERE role='dosen'");
@@ -78,16 +78,13 @@ function build_calendar($month, $year, $events) {
         $isToday = ($date == $today) ? "bg-primary text-white fw-bold" : "";
         $eventDot = $hasEvent ? "<div class='event-dot'></div>" : "";
         
-        // --- LOGIKA KLIK POPUP ---
         $onclick = "";
         $cursorStyle = "cursor:default;";
         
         if ($hasEvent) {
-            // Encode data jadwal ke JSON agar bisa dibaca Javascript
-            // Kita simpan list ruangan di dalam atribut data-jadwal
             $jsonDetails = htmlspecialchars(json_encode($events[$date]), ENT_QUOTES, 'UTF-8');
             $onclick = "onclick=\"showSchedule('$date', $jsonDetails)\"";
-            $cursorStyle = "cursor:pointer;"; // Ubah kursor jadi tangan
+            $cursorStyle = "cursor:pointer;";
         }
 
         $calendar .= "<td class='$isToday position-relative' $onclick style='$cursorStyle height: 50px; vertical-align: middle;'>
@@ -118,120 +115,122 @@ function build_calendar($month, $year, $events) {
   <link rel="stylesheet" href="ccsprogres.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    /* --- LAYOUT --- */
-    body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; background-color: #f4f6f9; margin: 0; }
-    .header { height: 70px; width: 100%; background: #fff; border-bottom: 1px solid #dee2e6; display: flex; align-items: center; justify-content: space-between; padding: 0 25px; flex-shrink: 0; position: relative; z-index: 9999; }
-    .layout-wrapper { display: flex; flex: 1; overflow: hidden; width: 100%; }
-    .sidebar-area { background-color: #343a40; overflow-y: auto; height: 100%; flex-shrink: 0; }
-    .main-content { flex: 1; padding: 30px; overflow-y: auto; height: 100%; }
+    /* --- LAYOUT FIXED POSITION (ACUAN FILE JADWAL) --- */
+    body { background-color: #f4f6f9; margin: 0; padding: 0; overflow-x: hidden; }
+
+    /* Header Fixed */
+    .header { 
+        position: fixed; top: 0; left: 0; width: 100%; height: 70px; 
+        background-color: #ffffff; border-bottom: 1px solid #dee2e6; z-index: 1050; 
+        display: flex; align-items: center; justify-content: space-between; padding: 0 25px; 
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05); 
+    }
     
+    /* Sidebar Fixed (Offset 70px dari atas) */
+    .sidebar { 
+        position: fixed; top: 70px; left: 0; width: 250px; height: calc(100vh - 70px); 
+        background-color: #343a40; color: white; overflow-y: auto; padding-top: 20px; 
+        z-index: 1040; 
+    }
+    
+    /* Main Content (Offset dari Header dan Sidebar) */
+    .main-content { 
+        margin-top: 70px; 
+        margin-left: 250px; 
+        padding: 30px; 
+        width: auto; 
+        background-color: #f4f6f9;
+    }
+    
+    /* Styling Tambahan */
     .stat-card { border: none; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); transition: transform 0.2s; }
     .stat-card:hover { transform: translateY(-5px); }
     .icon-box { width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; }
-    
-    /* Calendar Styles */
     .calendar-table th { font-size: 12px; }
     .calendar-table td { font-size: 14px; position: relative; }
-    .calendar-table td:hover { background-color: #e9ecef; } /* Efek hover */
     .event-dot { width: 6px; height: 6px; background-color: #dc3545; border-radius: 50%; margin: 2px auto 0 auto; }
-    .legend-item { font-size: 11px; color: #6c757d; }
   </style>
 </head>
 <body>
 
 <div class="header">
     <div class="d-flex align-items-center">
-        <img src="unimma.png" alt="Logo" style="height: 50px;">
-        <h4 class="m-0 ms-2 text-dark">DASHBOARD UTAMA</h4>
+        <img src="unimma.png" alt="Logo" style="height: 40px;">
+        <h5 class="m-0 ms-3 fw-bold text-dark">FAKULTAS TEKNIK</h5>
     </div>
     <div class="d-flex align-items-center gap-2">
-        <div class="text-end"><small class="d-block text-muted">Admin</small><b><?= htmlspecialchars($nama_admin) ?></b></div>
-        <div style="width: 40px; height: 40px; background: #e9ecef; border-radius: 50%; display: flex; justify-content: center; align-items: center;">👤</div>
+        <div class="text-end lh-sm">
+            <small class="text-muted d-block">Admin</small>
+            <span class="fw-bold"><?= htmlspecialchars($nama_admin) ?></span>
+        </div>
+        <div class="rounded-circle bg-light d-flex align-items-center justify-content-center border" style="width: 40px; height: 40px;">👤</div>
     </div>
 </div>
 
-<div class="layout-wrapper">
-    <div class="sidebar-area">
-        <?php $page = 'home_admin'; include "../templates/sidebar_admin.php"; ?>
+<?php 
+    $page = 'home_admin'; // Penanda halaman aktif
+    include "../templates/sidebar_admin.php";
+?>
+
+<div class="main-content">
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="card stat-card p-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div><p class="text-muted mb-1">Jumlah Dosen</p><h2 class="fw-bold m-0"><?= $total_dosen ?></h2></div>
+                    <div class="icon-box bg-primary text-white">👨‍🏫</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stat-card p-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div><p class="text-muted mb-1">Jumlah Mahasiswa</p><h2 class="fw-bold m-0"><?= $total_mhs ?></h2></div>
+                    <div class="icon-box bg-info text-white">🎓</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stat-card p-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div><p class="text-muted mb-1">Judul Skripsi Aktif</p><h2 class="fw-bold m-0"><?= $total_skripsi ?></h2></div>
+                    <div class="icon-box bg-success text-white">📚</div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <div class="main-content">
-        <div class="row g-4 mb-4">
-            <div class="col-md-4">
-                <div class="card stat-card p-3">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div><p class="text-muted mb-1">Jumlah Dosen</p><h2 class="fw-bold m-0"><?= $total_dosen ?></h2></div>
-                        <div class="icon-box bg-primary text-white">👨‍🏫</div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card stat-card p-3">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div><p class="text-muted mb-1">Jumlah Mahasiswa</p><h2 class="fw-bold m-0"><?= $total_mhs ?></h2></div>
-                        <div class="icon-box bg-info text-white">🎓</div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card stat-card p-3">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div><p class="text-muted mb-1">Judul Skripsi Aktif</p><h2 class="fw-bold m-0"><?= $total_skripsi ?></h2></div>
-                        <div class="icon-box bg-success text-white">📚</div>
-                    </div>
+    <div class="row g-4">
+        <div class="col-md-8">
+            <div class="card stat-card p-4 h-100">
+                <h5 class="mb-3">Statistik Prodi</h5>
+                <div style="flex: 1; min-height: 300px; position: relative;">
+                    <canvas id="prodiChart"></canvas>
                 </div>
             </div>
         </div>
 
-        <div class="row g-4">
-            <div class="col-md-8">
-                <div class="card stat-card p-4 h-100">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                         <h5 class="m-0">Statistik Prodi</h5>
+        <div class="col-md-4">
+            <div class="card stat-card p-4 h-100">
+                <h5 class="mb-3">Jadwal Ujian Skripsi</h5>
+                
+                <?= build_calendar($bulan_ini, $tahun_ini, $events); ?>
+                
+                <div class="mt-3">
+                    <div class="d-flex align-items-center gap-2 legend-item">
+                        <div style="width: 10px; height: 10px; background:#0d6efd;"></div> Hari Ini
                     </div>
-                    <div style="flex: 1; min-height: 300px; position: relative;">
-                        <canvas id="prodiChart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-4">
-                <div class="card stat-card p-4 h-100">
-                    <h5 class="mb-3">Jadwal Ujian Skripsi</h5>
-                    
-                    <?= build_calendar($bulan_ini, $tahun_ini, $events); ?>
-                    
-                    <div class="mt-3">
-                        <div class="d-flex align-items-center gap-2 legend-item">
-                            <div style="width: 10px; height: 10px; background:#0d6efd;"></div> Hari Ini
-                        </div>
-                        <div class="d-flex align-items-center gap-2 legend-item">
-                            <div style="width: 6px; height: 6px; background:#dc3545; border-radius:50%;"></div> Ada Jadwal (Klik tanggal untuk detail)
-                        </div>
+                    <div class="d-flex align-items-center gap-2 legend-item">
+                        <div style="width: 6px; height: 6px; background:#dc3545; border-radius:50%;"></div> Ada Jadwal
                     </div>
                 </div>
             </div>
         </div>
-    </div> 
-</div>
-
+    </div>
+</div> 
 <div class="modal fade" id="scheduleModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header bg-primary text-white">
-        <h5 class="modal-title">📅 Jadwal Ujian: <span id="modalDate"></span></h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <ul class="list-group" id="scheduleList">
-           </ul>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Tutup</button>
-      </div>
-    </div>
   </div>
-</div>
+
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
@@ -251,31 +250,21 @@ function build_calendar($month, $year, $events) {
     options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
   });
 
-  // FUNCTION UNTUK MENAMPILKAN MODAL
+  // FUNCTION UNTUK MENAMPILKAN MODAL (Hanya disertakan jika Anda memerlukannya)
   function showSchedule(dateStr, eventsArray) {
-      // 1. Set Judul Tanggal (Format jadi Tgl-Bln-Thn)
       const dateObj = new Date(dateStr);
       const formattedDate = dateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
       document.getElementById('modalDate').innerText = formattedDate;
 
-      // 2. Buat List Ruangan HTML
       let listHtml = '';
       if (eventsArray.length > 0) {
           eventsArray.forEach(item => {
-              listHtml += `
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <div>
-                        <span class="fw-bold text-primary">🚪 Ruang: ${item.ruang}</span><br>
-                        <small class="text-muted">Status: ${item.status}</small>
-                    </div>
-                </li>
-              `;
+              listHtml += `<li class="list-group-item d-flex justify-content-between align-items-center"><div><span class="fw-bold text-primary">🚪 Ruang: ${item.ruang}</span><br><small class="text-muted">Status: ${item.status}</small></div></li>`;
           });
       } else {
           listHtml = '<li class="list-group-item text-center">Tidak ada jadwal detail.</li>';
       }
 
-      // 3. Masukkan ke Modal dan Tampilkan
       document.getElementById('scheduleList').innerHTML = listHtml;
       const myModal = new bootstrap.Modal(document.getElementById('scheduleModal'));
       myModal.show();

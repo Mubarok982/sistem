@@ -34,8 +34,12 @@ $p = isset($page) ? $page : '';
     
     <h6 class="text-white text-uppercase ms-3 mb-2 mt-4" style="font-size: 11px; opacity: 0.8;">PENGAJUAN</h6>
     
+    <a href="tambah_mahasiswa_skripsi.php" class="<?= $p == 'tugas_akhir' ? 'active' : '' ?>">
+        <i class="fas fa-file-alt fa-fw me-2"></i> Tugas Akhir
+    </a>
+    
     <a href="#" class="<?= $p == 'status_semua' ? 'active' : '' ?>">
-        <i class="fas fa-clipboard fa-fw me-2"></i> Status TA Semua
+        <i class="fas fa-list-alt fa-fw me-2"></i> Status TA Semua
     </a>
     
     <a href="#" class="<?= $p == 'status_proposal' ? 'active' : '' ?>">
