@@ -2,7 +2,7 @@
 session_start();
 include "../admin/db.php";
 
-// --- LOAD ENGINE WA (FONNTE) ---
+// --- LOAD FONNTE ---
 if (file_exists("../config_fonnte.php")) {
     include "../config_fonnte.php";
     include "../kirim_fonnte.php";
@@ -20,7 +20,6 @@ $nip_login = $_SESSION['nip'];
 
 // --- 1. IDENTIFIKASI DOSEN ---
 $q_dosen = mysqli_query($conn, "SELECT id, nama, foto FROM mstr_akun WHERE username='$nip_login'");
-if (!$q_dosen) { die("Error Dosen: " . mysqli_error($conn)); }
 $data_dosen = mysqli_fetch_assoc($q_dosen);
 $id_dosen_login = $data_dosen['id'];
 
@@ -31,8 +30,8 @@ if (empty($npm_mhs)) {
     exit();
 }
 
-// [PERBAIKAN QUERY] 
-// Menggunakan LEFT JOIN skripsi berdasarkan ID (s.id_mahasiswa = dm.id)
+// [FIX QUERY] Mengambil data mahasiswa & skripsi
+// Kita gunakan LEFT JOIN skripsi berdasarkan ID (s.id_mahasiswa = dm.id)
 $q_mhs = "SELECT 
             m.nama, 
             dm.npm, 
@@ -46,16 +45,6 @@ $q_mhs = "SELECT
           WHERE dm.npm = '$npm_mhs'";
 
 $res_mhs = mysqli_query($conn, $q_mhs);
-
-// [DEBUGGING] Cek jika query gagal
-if (!$res_mhs) {
-    die("<div style='color:red; padding:20px; border:1px solid red; margin:20px;'>
-            <h3>❌ Query Error</h3>
-            Pesan: " . mysqli_error($conn) . "<br>
-            Query: $q_mhs
-         </div>");
-}
-
 $mhs = mysqli_fetch_assoc($res_mhs);
 
 if (!$mhs) { 
@@ -95,6 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit();
         }
     }
+    
     // B. Handle Nilai & Komentar
     elseif (isset($_POST['action']) && $_POST['action'] == 'nilai') {
         if (empty($peran)) {
@@ -104,13 +94,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $komentar   = mysqli_real_escape_string($conn, $_POST['komentar']);
             $status_nilai = $_POST['status']; 
             $bab_ke     = $_POST['bab_ke']; 
-    
+
             $kolom_komentar = ($peran == 'dosen1') ? 'komentar_dosen1' : 'komentar_dosen2';
             $kolom_nilai    = ($peran == 'dosen1') ? 'nilai_dosen1' : 'nilai_dosen2';
             $kolom_progres  = ($peran == 'dosen1') ? 'progres_dosen1' : 'progres_dosen2';
             
             $poin = ($status_nilai == 'ACC') ? 50 : 0; 
-    
+
             $update = "UPDATE progres_skripsi SET 
                         $kolom_komentar = '$komentar',
                         $kolom_nilai = '$status_nilai',
@@ -125,11 +115,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!empty($no_hp)) {
                     $no_hp = preg_replace('/[^0-9]/', '', $no_hp);
                     if (substr($no_hp, 0, 1) == '0') $no_hp = '62' . substr($no_hp, 1);
-    
+
                     $nama_dosen_pengirim = $data_dosen['nama'];
                     $peran_text = ($peran == 'dosen1') ? "(Pembimbing 1)" : "(Pembimbing 2)";
                     $judul_skripsi = $mhs['judul_skripsi'] ?? 'Judul Belum Ada';
-    
+
                     $pesan = "🔔 *Komentar Progres Skripsi*\n"
                            . "👨‍🎓 Nama: {$mhs['nama']}\n"
                            . "📘 Judul: {$judul_skripsi}\n"
@@ -140,7 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     kirimWaFonnte($no_hp, $pesan);
                 }
-    
+
                 echo "<script>alert('✅ Penilaian berhasil disimpan & Notifikasi terkirim!'); window.location='progres_mahasiswa.php?npm=$npm_mhs';</script>";
                 exit();
             } else {
@@ -155,13 +145,10 @@ $progres_per_bab = [];
 $q_prog = "SELECT * FROM progres_skripsi WHERE npm='$npm_mhs' ORDER BY created_at DESC";
 $res_prog = mysqli_query($conn, $q_prog);
 
-// Cek error query progres
-if (!$res_prog) {
-    die("Error Query Progres: " . mysqli_error($conn));
-}
-
-while ($row = mysqli_fetch_assoc($res_prog)) {
-    $progres_per_bab[$row['bab']][] = $row;
+if ($res_prog) {
+    while ($row = mysqli_fetch_assoc($res_prog)) {
+        $progres_per_bab[$row['bab']][] = $row;
+    }
 }
 ?>
 
@@ -175,16 +162,12 @@ while ($row = mysqli_fetch_assoc($res_prog)) {
     <link rel="stylesheet" href="../admin/ccsprogres.css">
     <style>
         body { background-color: #f4f6f9; margin: 0; padding: 0; overflow-x: hidden; }
-        .header { position: fixed; top: 0; left: 0; width: 100%; height: 70px; background-color: #ffffff; border-bottom: 1px solid #dee2e6; z-index: 1050; display: flex; align-items: center; justify-content: space-between; padding: 0 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        .sidebar { position: fixed; top: 70px; left: 0; width: 250px; height: calc(100vh - 70px); background-color: #343a40; color: white; overflow-y: auto; padding-top: 20px; z-index: 1040; }
+        .header { position: fixed; top: 0; left: 0; width: 100%; height: 70px; background: #ffffff; border-bottom: 1px solid #dee2e6; z-index: 1050; display: flex; align-items: center; justify-content: space-between; padding: 0 25px; }
+        .sidebar { position: fixed; top: 70px; left: 0; width: 250px; height: calc(100vh - 70px); background: #343a40; color: white; overflow-y: auto; padding-top: 20px; z-index: 1040; }
         .sidebar a { color: #cfd8dc; text-decoration: none; display: block; padding: 12px 25px; border-radius: 0 25px 25px 0; margin-bottom: 5px; transition: all 0.3s; border-left: 4px solid transparent; }
-        .sidebar a:hover, .sidebar a.active { background-color: #495057; color: #fff; padding-left: 30px; }
+        .sidebar a:hover, .sidebar a.active { background: #495057; color: #fff; padding-left: 30px; }
         .main-content { margin-top: 70px; margin-left: 250px; padding: 30px; width: auto; }
-        
-        .badge-status { padding: 5px 10px; border-radius: 20px; font-size: 0.8em; }
         .form-komentar { background-color: #fff3cd; padding: 15px; border-radius: 8px; border: 1px solid #ffeeba; }
-        
-        /* Modal */
         .modal-header { background-color: #0d6efd; color: white; }
         .btn-close { filter: invert(1); }
     </style>
@@ -197,7 +180,7 @@ while ($row = mysqli_fetch_assoc($res_prog)) {
         <h4 class="m-0 text-dark d-none d-md-block">MONITORING SKRIPSI</h4>
     </div>
     <div class="d-flex align-items-center gap-2">
-        <div class="text-end" style="line-height: 1.2;">
+        <div class="text-end">
             <small class="d-block text-muted">Login Sebagai</small>
             <span class="fw-bold"><?= htmlspecialchars($data_dosen['nama']) ?></span>
         </div>
@@ -313,6 +296,7 @@ while ($row = mysqli_fetch_assoc($res_prog)) {
                                             <div class="mb-2">
                                                 <label class="fw-bold small">Komentar / Revisi:</label>
                                                 <?php 
+                                                    // [FIX VARIABLE]
                                                     $komentar_lama = ($peran == 'dosen1') ? $row['komentar_dosen1'] : $row['komentar_dosen2'];
                                                     $status_lama = ($peran == 'dosen1') ? $row['nilai_dosen1'] : $row['nilai_dosen2'];
                                                 ?>

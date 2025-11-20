@@ -1,6 +1,5 @@
 <?php
 session_start();
-// Sesuaikan path db.php
 include "db.php";
 
 // Cek login
@@ -12,41 +11,57 @@ if (!isset($_SESSION['admin_username'])) {
 $nama_admin = $_SESSION['nama_admin'] ?? 'Admin';
 $npm = $_GET['npm'] ?? '';
 
-if (!$npm) {
+// Validasi NPM dari URL
+if (empty($npm)) {
     echo "<script>alert('NPM tidak ditemukan!'); window.location='home_admin.php';</script>";
     exit();
 }
 
-// --- QUERY 1: AMBIL DATA MAHASISWA ---
-// Mengambil Nama, Prodi, Judul Skripsi
-$query_mhs = "SELECT 
+// --- 1. AMBIL DATA MAHASISWA (LOGIKA FIX) ---
+// Kita cari mahasiswa di tabel 'data_mahasiswa' yang NPM-nya sesuai.
+// Lalu kita JOIN ke 'mstr_akun' untuk ambil Nama.
+// Lalu kita LEFT JOIN ke 'skripsi' untuk ambil Judul (via ID).
+
+$query_info = "SELECT 
                 m.nama, 
                 dm.prodi, 
                 s.judul AS judul_skripsi 
-              FROM mstr_akun m
-              JOIN data_mahasiswa dm ON m.id = dm.id
-              LEFT JOIN skripsi s ON m.id = s.id_mahasiswa
-              WHERE m.username = '$npm' AND m.role = 'mahasiswa'";
+              FROM data_mahasiswa dm
+              JOIN mstr_akun m ON dm.id = m.id
+              LEFT JOIN skripsi s ON dm.id = s.id_mahasiswa
+              WHERE dm.npm = '$npm'";
 
-$result_mhs = mysqli_query($conn, $query_mhs);
-$data_mhs = mysqli_fetch_assoc($result_mhs);
+$res_info = mysqli_query($conn, $query_info);
 
-if (!$data_mhs) {
-    echo "<script>alert('Data mahasiswa tidak ditemukan!'); window.location='home_admin.php';</script>";
-    exit();
+// Error Handling jika Query Gagal
+if (!$res_info) {
+    die("Query Error: " . mysqli_error($conn));
 }
 
-$nama  = $data_mhs['nama'];
-$prodi = $data_mhs['prodi'];
-$judul = !empty($data_mhs['judul_skripsi']) ? $data_mhs['judul_skripsi'] : '- Belum Mengajukan Judul -';
+$data_mhs = mysqli_fetch_assoc($res_info);
 
-// --- QUERY 2: AMBIL DATA PROGRES ---
-// Cek dulu apakah tabel progres_skripsi ada
+// Jika data mahasiswa tidak ada di database, tampilkan default agar halaman tidak blank/error
+if (!$data_mhs) {
+    $nama_display  = "Nama Tidak Ditemukan (Cek Biodata)";
+    $prodi_display = "-";
+    $judul_display = "-";
+} else {
+    $nama_display  = $data_mhs['nama'];
+    $prodi_display = $data_mhs['prodi'];
+    $judul_display = !empty($data_mhs['judul_skripsi']) ? $data_mhs['judul_skripsi'] : '- Belum Mengajukan Judul -';
+}
+
+// --- 2. AMBIL DATA PROGRES (DARI TABEL PROGRES_SKRIPSI) ---
+// Ini query utama untuk menampilkan file
+$progres_result = false;
 $cek_tabel = mysqli_query($conn, "SHOW TABLES LIKE 'progres_skripsi'");
-$progres = false;
 
 if (mysqli_num_rows($cek_tabel) > 0) {
-    $progres = mysqli_query($conn, "SELECT * FROM progres_skripsi WHERE npm = '$npm' ORDER BY bab ASC, id DESC");
+    $q_progres = "SELECT * FROM progres_skripsi WHERE npm = ? ORDER BY bab ASC, created_at DESC";
+    $stmt = $conn->prepare($q_progres);
+    $stmt->bind_param("s", $npm);
+    $stmt->execute();
+    $progres_result = $stmt->get_result();
 }
 ?>
 
@@ -59,31 +74,13 @@ if (mysqli_num_rows($cek_tabel) > 0) {
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="ccsprogres.css">
   <style>
-    /* --- LAYOUT FIXED (Konsisten) --- */
     body { background-color: #f4f6f9; margin: 0; padding: 0; overflow-x: hidden; }
-    
-    /* Header */
-    .header {
-        position: fixed; top: 0; left: 0; width: 100%; height: 70px;
-        background-color: #ffffff; border-bottom: 1px solid #dee2e6;
-        z-index: 1050; display: flex; align-items: center; justify-content: space-between;
-        padding: 0 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    }
-    .header h4 { font-size: 1.2rem; font-weight: 700; color: #333; margin-left: 10px; }
-
-    /* Sidebar */
-    .sidebar {
-        position: fixed; top: 70px; left: 0; width: 250px; height: calc(100vh - 70px);
-        background-color: #343a40; color: white; overflow-y: auto; padding-top: 20px; z-index: 1040;
-    }
-    .sidebar a {
-        color: #cfd8dc; text-decoration: none; display: block; padding: 12px 25px;
-        border-radius: 0 25px 25px 0; margin-bottom: 5px; transition: all 0.3s;
-    }
+    .header { position: fixed; top: 0; left: 0; width: 100%; height: 70px; background-color: #ffffff; border-bottom: 1px solid #dee2e6; z-index: 1050; display: flex; align-items: center; justify-content: space-between; padding: 0 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    .sidebar { position: fixed; top: 70px; left: 0; width: 250px; height: calc(100vh - 70px); background-color: #343a40; color: white; overflow-y: auto; padding-top: 20px; z-index: 1040; }
+    .sidebar a { color: #cfd8dc; text-decoration: none; display: block; padding: 12px 25px; border-radius: 0 25px 25px 0; margin-bottom: 5px; transition: all 0.3s; }
     .sidebar a:hover, .sidebar a.active { background-color: #495057; color: #fff; padding-left: 30px; }
-    
-    /* Content */
     .main-content { margin-top: 70px; margin-left: 250px; padding: 30px; width: auto; }
+    .badge-status { font-size: 0.85em; padding: 5px 10px; border-radius: 20px; }
   </style>
 </head>
 <body>
@@ -98,24 +95,21 @@ if (mysqli_num_rows($cek_tabel) > 0) {
         <small class="text-muted" style="display:block; font-size: 11px;">Login Sebagai</small>
         <span style="font-weight: 600; font-size: 14px;"><?= htmlspecialchars($nama_admin) ?></span>
     </div>
-    <div style="width: 40px; height: 40px; border-radius: 50%; background: #e9ecef;
-                display: flex; align-items: center; justify-content: center; border: 1px solid #ced4da; font-size: 20px;">
-        👤
-    </div>
+    <div style="width: 40px; height: 40px; border-radius: 50%; background: #e9ecef; display: flex; align-items: center; justify-content: center;">👤</div>
   </div>
 </div>
 
 <div class="sidebar">
-    <h6 class="text-uppercase text-secondary ms-3 mb-3" style="font-size: 12px; letter-spacing: 1px;">Menu Utama</h6>
-    <a href="home_admin.php" class="active" style="background-color: #0d6efd;">Dashboard</a>
+    <h6 class="text-uppercase text-secondary ms-3 mb-3" style="font-size: 12px;">Menu Utama</h6>
+    <a href="home_admin.php">Dashboard</a>
     <a href="laporan_sidang.php">Laporan Sidang</a>
     <a href="data_mahasiswa.php">Data Mahasiswa</a>
     <a href="data_dosen.php">Data Dosen</a>
-    <h6 class="text-uppercase text-secondary ms-3 mb-3 mt-4" style="font-size: 12px; letter-spacing: 1px;">Manajemen Akun</h6>
+    <h6 class="text-uppercase text-secondary ms-3 mb-3 mt-4" style="font-size: 12px;">Manajemen Akun</h6>
     <a href="akun_mahasiswa.php">Akun Mahasiswa</a>
     <a href="akun_dosen.php">Akun Dosen</a>
-    <a href="mahasiswa_skripsi.php">Data Skripsi</a>
-    <a href="../auth/login.php?action=logout" class="text-danger mt-4 border-top pt-3">Logout</a> 
+    <a href="mahasiswa_skripsi.php" class="active" style="background-color: #0d6efd;">Data Skripsi</a>
+    <a href="../auth/logout.php" class="text-danger mt-4 border-top pt-3">Logout</a> 
     <div class="text-center mt-5 text-muted" style="font-size: 11px;">&copy; 2025 UNIMMA</div>
 </div>
 
@@ -123,18 +117,18 @@ if (mysqli_num_rows($cek_tabel) > 0) {
     <div class="card p-4 shadow-sm border-0" style="border-radius: 12px;">
         <h4 class="mb-4 text-primary border-bottom pb-2">Detail Progres Skripsi Mahasiswa</h4>
         
-        <div class="row mb-4">
+        <div class="row mb-4 bg-light p-3 rounded mx-0">
             <div class="col-md-6">
-                <table class="table table-borderless">
-                    <tr><td width="150"><strong>NPM</strong></td><td>: <?= htmlspecialchars($npm) ?></td></tr>
-                    <tr><td><strong>Nama</strong></td><td>: <?= htmlspecialchars($nama) ?></td></tr>
-                    <tr><td><strong>Prodi</strong></td><td>: <?= htmlspecialchars($prodi) ?></td></tr>
+                <table class="table table-borderless m-0">
+                    <tr><td width="120"><strong>NPM</strong></td><td>: <span class="fw-bold"><?= htmlspecialchars($npm) ?></span></td></tr>
+                    <tr><td><strong>Nama</strong></td><td>: <?= htmlspecialchars($nama_display) ?></td></tr>
+                    <tr><td><strong>Prodi</strong></td><td>: <?= htmlspecialchars($prodi_display) ?></td></tr>
                 </table>
             </div>
             <div class="col-md-6">
-                <table class="table table-borderless">
+                <table class="table table-borderless m-0">
                     <tr><td><strong>Judul Skripsi</strong></td><td>:</td></tr>
-                    <tr><td colspan="2" class="fst-italic bg-light p-2 rounded"><?= htmlspecialchars($judul) ?></td></tr>
+                    <tr><td colspan="2" class="fst-italic text-dark"><?= htmlspecialchars($judul_display) ?></td></tr>
                 </table>
             </div>
         </div>
@@ -142,49 +136,64 @@ if (mysqli_num_rows($cek_tabel) > 0) {
         <a href="home_admin.php" class="btn btn-secondary btn-sm mb-3">← Kembali ke Dashboard</a>
 
         <div class="table-responsive">
-            <table class="table table-bordered table-hover mt-2">
+            <table class="table table-bordered table-hover mt-2 align-middle">
                 <thead class="table-dark">
                     <tr>
-                        <th>No</th>
-                        <th>BAB</th>
-                        <th>File Dokumen</th>
-                        <th>Tanggal Upload</th>
-                        <th>Status Pembimbing 1</th>
-                        <th>Status Pembimbing 2</th>
+                        <th class="text-center" width="5%">No</th>
+                        <th width="10%">BAB</th>
+                        <th width="25%">File Dokumen</th>
+                        <th width="20%">Tanggal Upload</th>
+                        <th class="text-center" width="20%">Status Pembimbing 1</th>
+                        <th class="text-center" width="20%">Status Pembimbing 2</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if ($progres && mysqli_num_rows($progres) > 0): ?>
-                        <?php $no = 1; while ($row = mysqli_fetch_assoc($progres)): ?>
+                    <?php 
+                    if ($progres_result && $progres_result->num_rows > 0): 
+                        $no = 1; 
+                        while ($row = $progres_result->fetch_assoc()): 
+                    ?>
                         <tr>
-                            <td><?= $no++ ?></td>
-                            <td class="fw-bold">BAB <?= htmlspecialchars($row['bab']) ?></td>
+                            <td class="text-center"><?= $no++ ?></td>
+                            <td class="fw-bold text-primary">BAB <?= htmlspecialchars($row['bab']) ?></td>
                             <td>
                                 <a href="../mahasiswa/uploads/<?= htmlspecialchars($row['file']) ?>" target="_blank" class="btn btn-sm btn-outline-primary">
                                     📄 Lihat File
                                 </a>
                             </td>
-                            <td><?= htmlspecialchars(date('d-m-Y H:i', strtotime($row['created_at']))) ?></td>
-                            <td>
+                            <td class="text-muted small">
+                                <?= htmlspecialchars(date('d M Y H:i', strtotime($row['created_at']))) ?>
+                            </td>
+                            <td class="text-center">
                                 <?php 
-                                    $status1 = $row['nilai_dosen1'] ?? '-';
-                                    $badge1 = ($status1 == 'ACC') ? 'success' : (($status1 == 'Revisi') ? 'danger' : 'secondary');
-                                    echo "<span class='badge bg-$badge1'>$status1</span>";
+                                    $s1 = $row['nilai_dosen1'] ?? '-';
+                                    $bg1 = ($s1 == 'ACC') ? 'success' : (($s1 == 'Revisi') ? 'danger' : 'secondary');
+                                    echo "<span class='badge bg-$bg1 badge-status'>$s1</span>";
+                                    
+                                    if(!empty($row['komentar_dosen1'])) {
+                                        echo "<div class='mt-1 small text-muted fst-italic'>\"".substr($row['komentar_dosen1'],0,30)."...\"</div>";
+                                    }
                                 ?>
                             </td>
-                            <td>
+                            <td class="text-center">
                                 <?php 
-                                    $status2 = $row['nilai_dosen2'] ?? '-';
-                                    $badge2 = ($status2 == 'ACC') ? 'success' : (($status2 == 'Revisi') ? 'danger' : 'secondary');
-                                    echo "<span class='badge bg-$badge2'>$status2</span>";
+                                    $s2 = $row['nilai_dosen2'] ?? '-';
+                                    $bg2 = ($s2 == 'ACC') ? 'success' : (($s2 == 'Revisi') ? 'danger' : 'secondary');
+                                    echo "<span class='badge bg-$bg2 badge-status'>$s2</span>";
+
+                                    if(!empty($row['komentar_dosen2'])) {
+                                        echo "<div class='mt-1 small text-muted fst-italic'>\"".substr($row['komentar_dosen2'],0,30)."...\"</div>";
+                                    }
                                 ?>
                             </td>
                         </tr>
-                        <?php endwhile; ?>
-                    <?php else: ?>
+                    <?php 
+                        endwhile; 
+                    else: 
+                    ?>
                         <tr>
-                            <td colspan="6" class="text-center text-muted py-4">
-                                <em>Belum ada data progres yang diunggah oleh mahasiswa ini.</em>
+                            <td colspan="6" class="text-center text-muted py-5">
+                                <em>Belum ada data progres yang diunggah oleh mahasiswa dengan NPM <b><?= htmlspecialchars($npm) ?></b>.</em>
                             </td>
                         </tr>
                     <?php endif; ?>
